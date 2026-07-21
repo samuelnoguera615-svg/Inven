@@ -1,0 +1,17 @@
+{
+  "name": "servigruas-cesar-inventario",
+  "version": "1.0.0",
+  "description": "Sistema de inventario inteligente para Servigruas Cesar",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2"
+  }
+}
