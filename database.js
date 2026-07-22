@@ -1,54 +1,31 @@
 const fs = require('fs');
 const path = require('path');
+const { createClient } = require('redis');
 
 const DB_PATH = path.join(__dirname, 'data', 'database.json');
 
-// Cliente KV perezoso (Lazy Load client) para evitar errores locales de inicialización
-let kvClient = null;
+// Cliente Redis TCP Perezoso (Lazy Load client) para no chocar localmente
+let redisClient = null;
 
-function getKVClient() {
-  if (kvClient) return kvClient;
+async function getRedisClient() {
+  if (redisClient) return redisClient;
 
-  // Buscar credenciales de conexión HTTP REST
-  let url = process.env.KV_REST_API_URL;
-  let token = process.env.KV_REST_API_TOKEN;
+  const redisUrl = process.env.REDIS_URL;
 
-  if (!url && process.env.UPSTASH_REDIS_REST_URL) {
-    url = process.env.UPSTASH_REDIS_REST_URL;
-    token = process.env.UPSTASH_REDIS_REST_TOKEN;
-  } else if (!url && process.env.REDIS_URL) {
+  // Si tenemos credencial TCP válida (Upstash u otro), creamos el cliente tradicional
+  if (redisUrl) {
     try {
-      const rawUrl = process.env.REDIS_URL;
-      if (rawUrl.startsWith('redis://') || rawUrl.startsWith('rediss://')) {
-        const cleanUrl = rawUrl.replace(/^rediss?:\/\//, '');
-        const [credentials, hostPort] = cleanUrl.split('@');
-        if (credentials && hostPort) {
-          const parts = credentials.split(':');
-          const password = parts.length > 1 ? parts[1] : parts[0];
-          const [host] = hostPort.split(':');
-          if (host && password) {
-            url = `https://${host}`;
-            token = password;
-          }
-        }
-      }
-    } catch (error) {
-      console.error("Error al parsear REDIS_URL en getKVClient:", error);
-    }
-  }
-
-  // Si tenemos credenciales válidas, creamos el cliente
-  if (url && token) {
-    try {
-      const { createClient } = require('@vercel/kv');
-      kvClient = createClient({ url, token });
-      console.log("Cliente de Vercel KV (Upstash) inicializado correctamente por REST.");
+      redisClient = createClient({ url: redisUrl });
+      redisClient.on('error', (err) => console.error("Error en Redis de database.js:", err.message));
+      await redisClient.connect();
+      console.log("Redis TCP conectado con éxito en database.js");
     } catch (e) {
-      console.error("Error al importar o instanciar createClient de @vercel/kv:", e);
+      console.error("Error al conectar cliente TCP de Redis en database.js:", e.message);
+      redisClient = null;
     }
   }
 
-  return kvClient;
+  return redisClient;
 }
 
 // Obtener datos iniciales de la base de datos
@@ -93,25 +70,26 @@ function migrateData(dbObj) {
   return { dbObj, migrated };
 }
 
-// Leer base de datos de forma asíncrona compatible con Local / Vercel KV
+// Leer base de datos de forma asíncrona compatible con Local / Redis TCP
 async function readDB() {
-  const kv = getKVClient();
+  const redis = await getRedisClient();
   
-  if (kv) {
+  if (redis) {
     try {
-      const dbObj = await kv.get('inventario_db');
-      if (!dbObj) {
+      const dataStr = await redis.get('inventario_db');
+      if (!dataStr) {
         const initial = getInitialData();
-        await kv.set('inventario_db', initial);
+        await redis.set('inventario_db', JSON.stringify(initial));
         return initial;
       }
+      const dbObj = JSON.parse(dataStr);
       const { dbObj: migratedObj, migrated } = migrateData(dbObj);
       if (migrated) {
-        await kv.set('inventario_db', migratedObj);
+        await redis.set('inventario_db', JSON.stringify(migratedObj));
       }
       return migratedObj;
     } catch (error) {
-      console.error("Error al leer de Vercel KV:", error);
+      console.error("Error al leer de Redis TCP:", error);
       return getInitialData();
     }
   } else {
@@ -142,16 +120,16 @@ async function readDB() {
   }
 }
 
-// Escribir base de datos de forma asíncrona compatible con Local / Vercel KV
+// Escribir base de datos de forma asíncrona compatible con Local / Redis TCP
 async function writeDB(data) {
-  const kv = getKVClient();
+  const redis = await getRedisClient();
 
-  if (kv) {
+  if (redis) {
     try {
-      await kv.set('inventario_db', data);
+      await redis.set('inventario_db', JSON.stringify(data));
       return true;
     } catch (error) {
-      console.error("Error al escribir en Vercel KV:", error);
+      console.error("Error al escribir en Redis TCP:", error);
       return false;
     }
   } else {

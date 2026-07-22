@@ -297,28 +297,30 @@ function parseConsumptionMessage(text, products) {
 
 // --- Rutas de la API ---
 
-// Debug de variables de entorno de Vercel
+// Debug de variables de entorno de Vercel (Native Redis version)
 app.get('/api/debug-env', async (req, res) => {
-  let kvClientError = null;
   let testGetResult = null;
+  let redisConnectionError = null;
   try {
-    const { kv } = require('@vercel/kv');
-    testGetResult = await kv.get('inventario_db');
+    if (redisClient && redisReady) {
+      await redisClient.set('inventario:debug', 'funcionando_perfecto');
+      testGetResult = await redisClient.get('inventario:debug');
+    } else {
+      testGetResult = "redisClient_not_ready";
+    }
   } catch (err) {
-    kvClientError = {
+    redisConnectionError = {
       message: err.message,
-      name: err.name,
-      stack: err.stack ? err.stack.split('\n').slice(0, 5) : null
+      name: err.name
     };
   }
 
   res.json({
-    kv_present: !!process.env.KV_REST_API_URL,
-    redis_keysPresent: Object.keys(process.env).filter(k => k.startsWith('KV_') || k.startsWith('REDIS_') || k.startsWith('UPSTASH_')),
-    node_env: process.env.NODE_ENV,
-    kvClientError,
-    parsed_url: process.env.KV_REST_API_URL,
-    testGetResult: testGetResult ? "found_data" : "no_data"
+    redis_configured: !!process.env.REDIS_URL,
+    redis_ready: redisReady,
+    testGetResult,
+    redisConnectionError,
+    node_env: process.env.NODE_ENV
   });
 });
 
