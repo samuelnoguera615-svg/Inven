@@ -297,6 +297,15 @@ function parseConsumptionMessage(text, products) {
 
 // --- Rutas de la API ---
 
+// Debug de variables de entorno de Vercel
+app.get('/api/debug-env', (req, res) => {
+  res.json({
+    kv_present: !!process.env.KV_REST_API_URL,
+    redis_keysPresent: Object.keys(process.env).filter(k => k.startsWith('KV_') || k.startsWith('REDIS_')),
+    node_env: process.env.NODE_ENV
+  });
+});
+
 // 1. Obtener todos los productos
 app.get('/api/products', async (req, res) => {
   res.json(await db.getProducts());
