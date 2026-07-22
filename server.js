@@ -37,6 +37,13 @@ initRedis();
 // Middleware
 app.use(cors());
 app.use(express.json());
+
+// Desactivar caché del navegador para todas las rutas de la API (Evita respuestas 304 obsoletas)
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  next();
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/health', (req, res) => {
