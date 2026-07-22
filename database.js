@@ -1,10 +1,31 @@
 const fs = require('fs');
 const path = require('path');
 
-// Soporte híbrido para integraciones de Upstash Redis directas en Vercel
-if (!process.env.KV_REST_API_URL && process.env.UPSTASH_REDIS_REST_URL) {
-  process.env.KV_REST_API_URL = process.env.UPSTASH_REDIS_REST_URL;
-  process.env.KV_REST_API_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+// Soporte híbrido para integraciones de Upstash Redis directas en Vercel o variables REDIS_URL
+if (!process.env.KV_REST_API_URL) {
+  if (process.env.UPSTASH_REDIS_REST_URL) {
+    process.env.KV_REST_API_URL = process.env.UPSTASH_REDIS_REST_URL;
+    process.env.KV_REST_API_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+  } else if (process.env.REDIS_URL) {
+    try {
+      const rawUrl = process.env.REDIS_URL;
+      if (rawUrl.startsWith('redis://') || rawUrl.startsWith('rediss://')) {
+        const cleanUrl = rawUrl.replace(/^rediss?:\/\//, '');
+        const [credentials, hostPort] = cleanUrl.split('@');
+        if (credentials && hostPort) {
+          const parts = credentials.split(':');
+          const password = parts.length > 1 ? parts[1] : parts[0];
+          const [host] = hostPort.split(':');
+          if (host && password) {
+            process.env.KV_REST_API_URL = `https://${host}`;
+            process.env.KV_REST_API_TOKEN = password;
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error al parsear REDIS_URL para modo Vercel KV:", error);
+    }
+  }
 }
 
 const { kv } = require('@vercel/kv');
