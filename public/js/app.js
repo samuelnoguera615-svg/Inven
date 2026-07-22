@@ -571,18 +571,30 @@ async function deleteProduct(code) {
     return;
   }
 
+  const normalizedCode = String(code).toUpperCase();
+  products = products.filter(item => item.code.toUpperCase() !== normalizedCode);
+  writeLocalProducts(products);
+  renderInventoryTable(products);
+  updateStats(products);
+  populateProviderFilter(products);
+  populateStatsProductSelect(products);
+  showToast(`Producto ${code} eliminado`, 'warning');
+
   try {
-    const res = await fetch(`${API_URL}/api/products/${code}`, {
+    const res = await fetch(`${API_URL}/api/products/${encodeURIComponent(normalizedCode)}`, {
       method: 'DELETE'
     });
 
-    if (!res.ok) throw new Error('Error al eliminar producto');
-    
-    showToast(`Producto ${code} eliminado`, 'warning');
-    fetchProducts();
-    fetchHistory();
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || 'Error al eliminar producto');
+    }
+
+    await fetchProducts();
+    await fetchHistory();
   } catch (error) {
-    showToast(error.message, 'danger');
+    console.warn('No se pudo sincronizar la eliminación con el servidor:', error);
+    showToast(`Eliminado localmente. ${error.message}`, 'warning');
   }
 }
 
