@@ -408,7 +408,6 @@ function setupProductForm() {
 
     const savedProduct = normalizeProductForStorage(payload);
     
-    // Guardar PRIMERO en localStorage para feedback instantáneo
     const existingProducts = products.filter(item => item.code.toUpperCase() !== savedProduct.code.toUpperCase());
     products = [...existingProducts, savedProduct];
     writeLocalProducts(products);
@@ -437,15 +436,14 @@ function setupProductForm() {
 
       if (res.ok) {
         showToast('Sincronizado con el servidor ✓', 'info');
+        await fetchProducts();
+        await fetchHistory();
+        await fetchOfficeLocations();
       }
     } catch (error) {
       console.warn('No se pudo sincronizar con el servidor, pero el producto se guardó localmente:', error);
       showToast('Producto guardado localmente. Conexión con servidor no disponible.', 'warning');
     }
-    
-    fetchProducts();
-    fetchHistory();
-    fetchOfficeLocations();
   });
 }
 
