@@ -13,6 +13,7 @@
   "dependencies": {
     "@vercel/kv": "^3.0.0",
     "cors": "^2.8.5",
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "redis": "^6.1.0"
   }
 }

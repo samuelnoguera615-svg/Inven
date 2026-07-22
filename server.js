@@ -1,10 +1,38 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const { createClient } = require('redis');
 const db = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+let redisClient = null;
+let redisReady = false;
+
+async function initRedis() {
+  const redisUrl = process.env.REDIS_URL;
+
+  if (!redisUrl) {
+    console.log('Redis no configurado. Se continuará con el almacenamiento local.');
+    return;
+  }
+
+  redisClient = createClient({ url: redisUrl });
+  redisClient.on('error', (err) => console.error('Error en Redis:', err.message));
+
+  try {
+    await redisClient.connect();
+    redisReady = true;
+    console.log('Redis conectado correctamente.');
+  } catch (error) {
+    console.warn('No se pudo conectar a Redis; continuando sin él.', error.message);
+    redisClient = null;
+    redisReady = false;
+  }
+}
+
+initRedis();
 
 // Middleware
 app.use(cors());
@@ -12,7 +40,29 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/health', (req, res) => {
-  res.json({ ok: true, message: 'API funcionando' });
+  res.json({
+    ok: true,
+    message: 'API funcionando',
+    redis: redisReady
+      ? { connected: true }
+      : { connected: false, message: 'Redis no configurado o sin conexión' }
+  });
+});
+
+app.get('/api/redis-test', async (req, res) => {
+  if (!redisClient || !redisReady) {
+    return res.status(503).json({ ok: false, message: 'Redis no está disponible' });
+  }
+
+  try {
+    const payload = `ping:${Date.now()}`;
+    await redisClient.set('inventario:ping', payload);
+    const value = await redisClient.get('inventario:ping');
+    res.json({ ok: true, value });
+  } catch (error) {
+    console.error('Error al usar Redis:', error);
+    res.status(500).json({ ok: false, message: 'Error al usar Redis' });
+  }
 });
 
 // Servir el frontend principal
