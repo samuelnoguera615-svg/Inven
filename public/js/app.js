@@ -406,6 +406,20 @@ function setupProductForm() {
       ubicacionDetalle
     };
 
+    const savedProduct = normalizeProductForStorage(payload);
+    
+    // Guardar PRIMERO en localStorage para feedback instantáneo
+    const existingProducts = products.filter(item => item.code.toUpperCase() !== savedProduct.code.toUpperCase());
+    products = [...existingProducts, savedProduct];
+    writeLocalProducts(products);
+    renderInventoryTable(products);
+    updateStats(products);
+    populateProviderFilter(products);
+    populateStatsProductSelect(products);
+    
+    showToast(isEditing ? 'Producto actualizado (guardado localmente)' : 'Producto agregado ✓ (guardado localmente)', 'success');
+    closeModal();
+
     try {
       const res = await fetch(`${API_URL}/api/products`, {
         method: 'POST',
@@ -421,33 +435,17 @@ function setupProductForm() {
         body = await res.text();
       }
 
-      if (!res.ok) {
-        throw new Error(body.error || body.message || 'Error al guardar el producto');
+      if (res.ok) {
+        showToast('Sincronizado con el servidor ✓', 'info');
       }
-
-      const savedProduct = normalizeProductForStorage({
-        ...(body && typeof body === 'object' ? body : {}),
-        ...payload
-      });
-
-      const existingProducts = products.filter(item => item.code.toUpperCase() !== savedProduct.code.toUpperCase());
-      products = [...existingProducts, savedProduct];
-      writeLocalProducts(products);
-      renderInventoryTable(products);
-      updateStats(products);
-      populateProviderFilter(products);
-      populateStatsProductSelect(products);
-      
-      showToast(isEditing ? 'Producto actualizado' : 'Producto agregado con éxito', 'success');
-      closeModal();
-      await Promise.all([fetchProducts(), fetchHistory(), fetchOfficeLocations()]);
-      setTimeout(() => {
-        fetchProducts();
-      }, 1000);
     } catch (error) {
-      console.error(error);
-      showToast(error.message, 'danger');
+      console.warn('No se pudo sincronizar con el servidor, pero el producto se guardó localmente:', error);
+      showToast('Producto guardado localmente. Conexión con servidor no disponible.', 'warning');
     }
+    
+    fetchProducts();
+    fetchHistory();
+    fetchOfficeLocations();
   });
 }
 
