@@ -1,12 +1,22 @@
 const fs = require('fs');
 const path = require('path');
 
-// Soporte híbrido para integraciones de Upstash Redis directas en Vercel o variables REDIS_URL
-if (!process.env.KV_REST_API_URL) {
-  if (process.env.UPSTASH_REDIS_REST_URL) {
-    process.env.KV_REST_API_URL = process.env.UPSTASH_REDIS_REST_URL;
-    process.env.KV_REST_API_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
-  } else if (process.env.REDIS_URL) {
+const DB_PATH = path.join(__dirname, 'data', 'database.json');
+
+// Cliente KV perezoso (Lazy Load client) para evitar errores locales de inicialización
+let kvClient = null;
+
+function getKVClient() {
+  if (kvClient) return kvClient;
+
+  // Buscar credenciales de conexión HTTP REST
+  let url = process.env.KV_REST_API_URL;
+  let token = process.env.KV_REST_API_TOKEN;
+
+  if (!url && process.env.UPSTASH_REDIS_REST_URL) {
+    url = process.env.UPSTASH_REDIS_REST_URL;
+    token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  } else if (!url && process.env.REDIS_URL) {
     try {
       const rawUrl = process.env.REDIS_URL;
       if (rawUrl.startsWith('redis://') || rawUrl.startsWith('rediss://')) {
@@ -17,20 +27,29 @@ if (!process.env.KV_REST_API_URL) {
           const password = parts.length > 1 ? parts[1] : parts[0];
           const [host] = hostPort.split(':');
           if (host && password) {
-            process.env.KV_REST_API_URL = `https://${host}`;
-            process.env.KV_REST_API_TOKEN = password;
+            url = `https://${host}`;
+            token = password;
           }
         }
       }
     } catch (error) {
-      console.error("Error al parsear REDIS_URL para modo Vercel KV:", error);
+      console.error("Error al parsear REDIS_URL en getKVClient:", error);
     }
   }
+
+  // Si tenemos credenciales válidas, creamos el cliente
+  if (url && token) {
+    try {
+      const { createClient } = require('@vercel/kv');
+      kvClient = createClient({ url, token });
+      console.log("Cliente de Vercel KV (Upstash) inicializado correctamente por REST.");
+    } catch (e) {
+      console.error("Error al importar o instanciar createClient de @vercel/kv:", e);
+    }
+  }
+
+  return kvClient;
 }
-
-const { kv } = require('@vercel/kv');
-
-const DB_PATH = path.join(__dirname, 'data', 'database.json');
 
 // Obtener datos iniciales de la base de datos
 function getInitialData() {
@@ -76,7 +95,9 @@ function migrateData(dbObj) {
 
 // Leer base de datos de forma asíncrona compatible con Local / Vercel KV
 async function readDB() {
-  if (process.env.KV_REST_API_URL) {
+  const kv = getKVClient();
+  
+  if (kv) {
     try {
       const dbObj = await kv.get('inventario_db');
       if (!dbObj) {
@@ -123,7 +144,9 @@ async function readDB() {
 
 // Escribir base de datos de forma asíncrona compatible con Local / Vercel KV
 async function writeDB(data) {
-  if (process.env.KV_REST_API_URL) {
+  const kv = getKVClient();
+
+  if (kv) {
     try {
       await kv.set('inventario_db', data);
       return true;

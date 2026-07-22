@@ -298,11 +298,27 @@ function parseConsumptionMessage(text, products) {
 // --- Rutas de la API ---
 
 // Debug de variables de entorno de Vercel
-app.get('/api/debug-env', (req, res) => {
+app.get('/api/debug-env', async (req, res) => {
+  let kvClientError = null;
+  let testGetResult = null;
+  try {
+    const { kv } = require('@vercel/kv');
+    testGetResult = await kv.get('inventario_db');
+  } catch (err) {
+    kvClientError = {
+      message: err.message,
+      name: err.name,
+      stack: err.stack ? err.stack.split('\n').slice(0, 5) : null
+    };
+  }
+
   res.json({
     kv_present: !!process.env.KV_REST_API_URL,
     redis_keysPresent: Object.keys(process.env).filter(k => k.startsWith('KV_') || k.startsWith('REDIS_') || k.startsWith('UPSTASH_')),
-    node_env: process.env.NODE_ENV
+    node_env: process.env.NODE_ENV,
+    kvClientError,
+    parsed_url: process.env.KV_REST_API_URL,
+    testGetResult: testGetResult ? "found_data" : "no_data"
   });
 });
 
