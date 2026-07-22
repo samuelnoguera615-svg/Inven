@@ -1,5 +1,63 @@
 // URL de la API (Servidor local)
 const API_URL = '';
+const STORAGE_KEY = 'servigruas-inventario-products-v1';
+
+function readLocalProducts() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.warn('No se pudieron leer los productos guardados localmente.', error);
+    return [];
+  }
+}
+
+function writeLocalProducts(data) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    return true;
+  } catch (error) {
+    console.warn('No se pudieron guardar los productos localmente.', error);
+    return false;
+  }
+}
+
+function normalizeProductForStorage(product) {
+  return {
+    ...product,
+    code: String(product.code || '').toUpperCase(),
+    name: product.name || 'Sin nombre',
+    proveedor: product.proveedor || 'General',
+    quantity: Number(product.quantity || 0),
+    minQuantity: Number(product.minQuantity || 0),
+    price: Number(product.price || 0),
+    pendingReplenishment: Number(product.pendingReplenishment || 0),
+    ubicacion: product.ubicacion || 'Almacén',
+    ubicacionDetalle: product.ubicacionDetalle || ''
+  };
+}
+
+function mergeInventoryData(remoteProducts) {
+  const localProducts = readLocalProducts();
+  if (!localProducts.length) {
+    return (remoteProducts || []).map(normalizeProductForStorage);
+  }
+
+  const merged = [...(remoteProducts || []).map(normalizeProductForStorage)];
+  localProducts.forEach(localProduct => {
+    const normalizedLocal = normalizeProductForStorage(localProduct);
+    const existingIndex = merged.findIndex(item => item.code.toUpperCase() === normalizedLocal.code.toUpperCase());
+    if (existingIndex >= 0) {
+      merged[existingIndex] = { ...merged[existingIndex], ...normalizedLocal };
+    } else {
+      merged.push(normalizedLocal);
+    }
+  });
+
+  return merged;
+}
 
 // Variables de Estado
 let products = [];
@@ -130,21 +188,36 @@ function setupTabs() {
 // --- PRODUCTOS: CONTROLADOR DE API & RENDERING ---
 
 async function fetchProducts() {
+  const localProducts = readLocalProducts();
+  if (localProducts.length) {
+    products = mergeInventoryData(localProducts);
+    renderInventoryTable(products);
+    updateStats(products);
+    populateProviderFilter(products);
+    populateStatsProductSelect(products);
+  }
+
   try {
     const res = await fetch(`${API_URL}/api/products`);
     if (!res.ok) throw new Error('Error al obtener productos');
-    products = await res.json();
+    const remoteProducts = await res.json();
+    products = mergeInventoryData(remoteProducts);
+    writeLocalProducts(products);
     renderInventoryTable(products);
     updateStats(products);
     populateProviderFilter(products);
     populateStatsProductSelect(products);
   } catch (error) {
     console.error(error);
-    showToast("Error de conexión con el servidor", 'danger');
-    const tbody = document.getElementById('inventory-table-body');
-    tbody.innerHTML = `<tr><td colspan="8" class="empty-state" style="color: var(--danger); font-weight: 500;">
-      ❌ Error de Conexión: No se pudo obtener el inventario. Asegúrate de que el servidor esté corriendo (<code>node server.js</code>) y recarga la página.
-    </td></tr>`;
+    if (!localProducts.length) {
+      showToast("Error de conexión con el servidor", 'danger');
+      const tbody = document.getElementById('inventory-table-body');
+      tbody.innerHTML = `<tr><td colspan="8" class="empty-state" style="color: var(--danger); font-weight: 500;">
+        ❌ Error de Conexión: No se pudo obtener el inventario. Asegúrate de que el servidor esté corriendo (<code>node server.js</code>) y recarga la página.
+      </td></tr>`;
+    } else {
+      showToast('Se está usando la copia guardada en este navegador.', 'warning');
+    }
   }
 }
 
@@ -351,6 +424,19 @@ function setupProductForm() {
       if (!res.ok) {
         throw new Error(body.error || body.message || 'Error al guardar el producto');
       }
+
+      const savedProduct = normalizeProductForStorage({
+        ...(body && typeof body === 'object' ? body : {}),
+        ...payload
+      });
+
+      const existingProducts = products.filter(item => item.code.toUpperCase() !== savedProduct.code.toUpperCase());
+      products = [...existingProducts, savedProduct];
+      writeLocalProducts(products);
+      renderInventoryTable(products);
+      updateStats(products);
+      populateProviderFilter(products);
+      populateStatsProductSelect(products);
       
       showToast(isEditing ? 'Producto actualizado' : 'Producto agregado con éxito', 'success');
       closeModal();

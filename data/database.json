@@ -441,6 +441,19 @@
       "ubicacionDetalle": "",
       "createdAt": "2026-07-22T00:29:26.189Z",
       "updatedAt": "2026-07-22T00:29:26.189Z"
+    },
+    {
+      "code": "TEST-LOCAL",
+      "name": "Local Save",
+      "proveedor": "X",
+      "quantity": 3,
+      "minQuantity": 1,
+      "price": 8,
+      "pendingReplenishment": 0,
+      "ubicacion": "Almacén",
+      "ubicacionDetalle": "",
+      "createdAt": "2026-07-22T00:35:05.132Z",
+      "updatedAt": "2026-07-22T00:35:05.132Z"
     }
   ],
   "history": [
@@ -927,6 +940,17 @@
       "priceUnit": 12,
       "person": "Administrador",
       "details": "Nuevo producto registrado en inventario con 7 unidades (ubicación: Almacén) a un precio de $12.00 c/u."
+    },
+    {
+      "id": "log_1784680505133_clq3q",
+      "timestamp": "2026-07-22T00:35:05.132Z",
+      "action": "CREAR_PRODUCTO",
+      "productCode": "TEST-LOCAL",
+      "productName": "Local Save",
+      "quantityChange": 3,
+      "priceUnit": 8,
+      "person": "Administrador",
+      "details": "Nuevo producto registrado en inventario con 3 unidades (ubicación: Almacén) a un precio de $8.00 c/u."
     }
   ],
   "chat_messages": [
