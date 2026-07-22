@@ -248,19 +248,19 @@ function parseConsumptionMessage(text, products) {
 // --- Rutas de la API ---
 
 // 1. Obtener todos los productos
-app.get('/api/products', (req, res) => {
-  res.json(db.getProducts());
+app.get('/api/products', async (req, res) => {
+  res.json(await db.getProducts());
 });
 
 // 2. Registrar o actualizar un producto
-app.post('/api/products', (req, res) => {
+app.post('/api/products', async (req, res) => {
   const { code, name, proveedor, quantity, minQuantity, price, ubicacion, ubicacionDetalle } = req.body;
   
   if (!code || !name || quantity === undefined) {
     return res.status(400).json({ error: "Faltan datos obligatorios (código, nombre, cantidad)." });
   }
   
-  const saved = db.saveProduct({
+  const saved = await db.saveProduct({
     code,
     name,
     proveedor,
@@ -272,16 +272,16 @@ app.post('/api/products', (req, res) => {
   });
 
   if (ubicacion === "Oficina" && ubicacionDetalle) {
-    db.saveOfficeLocation(ubicacionDetalle);
+    await db.saveOfficeLocation(ubicacionDetalle);
   }
 
   res.json(saved);
 });
 
 // 3. Eliminar producto
-app.delete('/api/products/:code', (req, res) => {
+app.delete('/api/products/:code', async (req, res) => {
   const code = req.params.code;
-  const success = db.deleteProduct(code);
+  const success = await db.deleteProduct(code);
   if (success) {
     res.json({ success: true, message: `Producto ${code} eliminado con éxito.` });
   } else {
@@ -290,34 +290,34 @@ app.delete('/api/products/:code', (req, res) => {
 });
 
 // 4. Obtener historial de auditoría
-app.get('/api/history', (req, res) => {
-  res.json(db.getHistory());
+app.get('/api/history', async (req, res) => {
+  res.json(await db.getHistory());
 });
 
 // 5. Obtener historial de mensajes de chat
-app.get('/api/chat/messages', (req, res) => {
-  res.json(db.getChatMessages());
+app.get('/api/chat/messages', async (req, res) => {
+  res.json(await db.getChatMessages());
 });
 
 // Obtener ubicaciones guardadas para autocompletar
-app.get('/api/office-locations', (req, res) => {
-  res.json(db.getOfficeLocations());
+app.get('/api/office-locations', async (req, res) => {
+  res.json(await db.getOfficeLocations());
 });
 
 // 6. Enviar mensaje de chat y procesar consumo (NLP)
-app.post('/api/chat/message', (req, res) => {
+app.post('/api/chat/message', async (req, res) => {
   const { text } = req.body;
   if (!text || text.trim() === '') {
     return res.status(400).json({ error: "El texto del mensaje no puede estar vacío." });
   }
 
   // Guardar mensaje del usuario
-  const userMsg = db.addChatMessage({
+  const userMsg = await db.addChatMessage({
     sender: "user",
     text: text
   });
 
-  const products = db.getProducts();
+  const products = await db.getProducts();
   const parsed = parseConsumptionMessage(text, products);
 
   // Si no se detectó código de producto
@@ -325,7 +325,7 @@ app.post('/api/chat/message', (req, res) => {
     const availableCodes = products.slice(0, 5).map(p => `\`${p.code}\` (${p.name})`).join(', ');
     const botReply = `❌ **No pude detectar el código del producto.**\n\nPor favor, escribe un mensaje que incluya el código del producto, por ejemplo: \`LAP-01\` o \`MON-24\`.\n\n_Ejemplos de códigos en inventario: ${availableCodes || 'Ninguno aún'}_`;
     
-    const botMsg = db.addChatMessage({
+    const botMsg = await db.addChatMessage({
       sender: "bot",
       text: botReply,
       status: "error"
@@ -347,7 +347,7 @@ app.post('/api/chat/message', (req, res) => {
       botReply = `❌ **Acción no reconocida**\n\nHe detectado el producto \`${parsed.code}\`, pero no pude determinar si deseas **añadir** o **quitar** stock.\n\nPor favor, utiliza palabras claras o símbolos:\n• Para **añadir**: _añadir, ingresar, reponer, agregar o un signo +_\n• Para **quitar**: _consumir, retirar, quitar, descontar o un signo -_\n\n_Ejemplo: "César consumió 2 ${parsed.code} para la grúa 12" o "Ana ingresó 5 ${parsed.code}"_`;
     }
     
-    const botMsg = db.addChatMessage({
+    const botMsg = await db.addChatMessage({
       sender: "bot",
       text: botReply,
       status: "error",
@@ -369,7 +369,7 @@ app.post('/api/chat/message', (req, res) => {
 
   if (parsed.isAddition) {
     // Procesar ingreso de stock
-    result = db.processAddition(parsed.code, parsed.quantity, parsed.person);
+    result = await db.processAddition(parsed.code, parsed.quantity, parsed.person);
     
     if (result.success) {
       status = "success";
@@ -384,7 +384,7 @@ app.post('/api/chat/message', (req, res) => {
                  `• **Responsable**: ${parsed.person}\n` +
                  `• **Producto**: ${result.productName} (\`${result.productCode}\`)\n` +
                  `• **Cantidad ingresada**: **${result.quantity}** unidades\n` +
-                 `• **Valor de ingreso**: **$${addValueFormatted}** _(${result.quantity} und x $${priceUnitFormatted} c/u)_\n` +
+                 `• **Valor de ingreso**: **${addValueFormatted}** _(${result.quantity} und x ${priceUnitFormatted} c/u)_\n` +
                  `• **Estado de reposición**: ${pendingReplenishText}\n` +
                  `• **Stock actual**: **${result.remainingQuantity}**\n\n` +
                  `_ID de transacción: \`${transactionId}\` (puedes deshacer esta acción si fue un error)._`;
@@ -396,7 +396,7 @@ app.post('/api/chat/message', (req, res) => {
     }
   } else {
     // Procesar consumo de stock (quitar)
-    result = db.processConsumption(parsed.code, parsed.quantity, parsed.person, parsed.vehicle);
+    result = await db.processConsumption(parsed.code, parsed.quantity, parsed.person, parsed.vehicle);
     
     if (result.success) {
       status = "success";
@@ -412,7 +412,7 @@ app.post('/api/chat/message', (req, res) => {
                  `• **Vehículo (Placa)**: ${vehicleText}\n` +
                  `• **Producto**: ${result.productName} (\`${result.productCode}\`)\n` +
                  `• **Cantidad retirada**: **${result.quantity}** unidades\n` +
-                 `• **Costo de reposición**: **$${repCostFormatted}** _(${result.quantity} und x $${priceUnitFormatted} c/u)_\n` +
+                 `• **Costo de reposición**: **${repCostFormatted}** _(${result.quantity} und x ${priceUnitFormatted} c/u)_\n` +
                  `• **Para reponer esta acción**: Debes ingresar **${result.quantity}** unidades de este producto.\n` +
                  `• **Total pendiente por reponer**: **${result.pendingReplenishment}** unidades.\n` +
                  `• **Stock restante**: **${result.remainingQuantity}**\n\n` +
@@ -434,7 +434,7 @@ app.post('/api/chat/message', (req, res) => {
   }
 
   // Guardar mensaje de respuesta del bot
-  const botMsg = db.addChatMessage({
+  const botMsg = await db.addChatMessage({
     sender: "bot",
     text: botReply,
     status: status,
@@ -452,18 +452,18 @@ app.post('/api/chat/message', (req, res) => {
 });
 
 // 7. Deshacer un consumo
-app.post('/api/chat/undo', (req, res) => {
+app.post('/api/chat/undo', async (req, res) => {
   const { transactionId } = req.body;
   if (!transactionId) {
     return res.status(400).json({ error: "Se requiere un ID de transacción." });
   }
 
-  const result = db.undoTransaction(transactionId);
+  const result = await db.undoTransaction(transactionId);
 
   if (result.success) {
     const undoReply = `🔄 **Acción Deshecha**\n\nSe han restaurado **${result.restoredQuantity}** unidades del producto **${result.productName}** (\`${result.productCode}\`).\n\n• **Nuevo Stock**: **${result.newQuantity}** unidades.`;
     
-    const botMsg = db.addChatMessage({
+    const botMsg = await db.addChatMessage({
       sender: "bot",
       text: undoReply,
       status: "info"
@@ -482,7 +482,7 @@ app.post('/api/chat/undo', (req, res) => {
 });
 
 // 8. Eliminar todo el historial con código de seguridad
-app.post('/api/history/clear', (req, res) => {
+app.post('/api/history/clear', async (req, res) => {
   const { code } = req.body;
   if (!code) {
     return res.status(400).json({ error: "Se requiere el código de seguridad." });
@@ -492,7 +492,7 @@ app.post('/api/history/clear', (req, res) => {
     return res.status(403).json({ error: "Código de seguridad incorrecto." });
   }
 
-  const success = db.clearHistory();
+  const success = await db.clearHistory();
   if (success) {
     res.json({ success: true, message: "Historial eliminado con éxito." });
   } else {

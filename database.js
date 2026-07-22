@@ -1,98 +1,134 @@
 const fs = require('fs');
 const path = require('path');
+const { kv } = require('@vercel/kv');
 
 const DB_PATH = path.join(__dirname, 'data', 'database.json');
 
-// Inicializar base de datos
-function initDB() {
-  const dir = path.dirname(DB_PATH);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
+// Obtener datos iniciales de la base de datos
+function getInitialData() {
+  return {
+    products: [],
+    history: [],
+    officeLocations: [],
+    chat_messages: [
+      {
+        id: "msg_welcome",
+        timestamp: new Date().toISOString(),
+        sender: "bot",
+        text: "¡Hola! Bienvenido al chat de control de inventario. Registra productos en el panel de inventario y luego escríbeme aquí para registrar consumos.",
+        status: "info"
+      }
+    ]
+  };
+}
 
-  if (!fs.existsSync(DB_PATH)) {
-    const initialData = {
-      products: [],
-      history: [],
-      officeLocations: [],
-      chat_messages: [
-        {
-          id: "msg_welcome",
-          timestamp: new Date().toISOString(),
-          sender: "bot",
-          text: "¡Hola! Bienvenido al chat de control de inventario. Registra productos en el panel de inventario y luego escríbeme aquí para registrar consumos.",
-          status: "info"
-        }
-      ]
-    };
-    writeDB(initialData);
-  } else {
-    // Migración de base de datos de category a proveedor e inicialización de ubicaciones
-    try {
-      const data = fs.readFileSync(DB_PATH, 'utf8');
-      const dbObj = JSON.parse(data);
-      let migrated = false;
-      if (!dbObj.officeLocations) {
-        dbObj.officeLocations = [];
+// Migración de datos estructurados para compatibilidad de versión
+function migrateData(dbObj) {
+  let migrated = false;
+  if (!dbObj.officeLocations) {
+    dbObj.officeLocations = [];
+    migrated = true;
+  }
+  if (dbObj.products) {
+    dbObj.products.forEach(p => {
+      if (p.hasOwnProperty('category')) {
+        p.proveedor = p.category;
+        delete p.category;
         migrated = true;
       }
-      if (dbObj.products) {
-        dbObj.products.forEach(p => {
-          if (p.hasOwnProperty('category')) {
-            p.proveedor = p.category;
-            delete p.category;
-            migrated = true;
-          }
-          if (!p.hasOwnProperty('ubicacion')) {
-            p.ubicacion = "Almacén";
-            p.ubicacionDetalle = "";
-            migrated = true;
-          }
-        });
+      if (!p.hasOwnProperty('ubicacion')) {
+        p.ubicacion = "Almacén";
+        p.ubicacionDetalle = "";
+        migrated = true;
       }
+    });
+  }
+  return { dbObj, migrated };
+}
+
+// Leer base de datos de forma asíncrona compatible con Local / Vercel KV
+async function readDB() {
+  if (process.env.KV_REST_API_URL) {
+    try {
+      const dbObj = await kv.get('inventario_db');
+      if (!dbObj) {
+        const initial = getInitialData();
+        await kv.set('inventario_db', initial);
+        return initial;
+      }
+      const { dbObj: migratedObj, migrated } = migrateData(dbObj);
       if (migrated) {
-        fs.writeFileSync(DB_PATH, JSON.stringify(dbObj, null, 2), 'utf8');
-        console.log("Base de datos migrada: se inicializaron ubicaciones.");
+        await kv.set('inventario_db', migratedObj);
       }
-    } catch (e) {
-      console.error("Error al migrar la base de datos:", e);
+      return migratedObj;
+    } catch (error) {
+      console.error("Error al leer de Vercel KV:", error);
+      return getInitialData();
+    }
+  } else {
+    // Modo local (archivo JSON físico)
+    try {
+      const dir = path.dirname(DB_PATH);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+
+      if (!fs.existsSync(DB_PATH)) {
+        const initial = getInitialData();
+        fs.writeFileSync(DB_PATH, JSON.stringify(initial, null, 2), 'utf8');
+        return initial;
+      }
+
+      const data = fs.readFileSync(DB_PATH, 'utf8');
+      const dbObj = JSON.parse(data);
+      const { dbObj: migratedObj, migrated } = migrateData(dbObj);
+      if (migrated) {
+        fs.writeFileSync(DB_PATH, JSON.stringify(migratedObj, null, 2), 'utf8');
+      }
+      return migratedObj;
+    } catch (error) {
+      console.error("Error al leer la base de datos local:", error);
+      return getInitialData();
     }
   }
 }
 
-// Leer base de datos de forma segura
-function readDB() {
-  try {
-    initDB();
-    const data = fs.readFileSync(DB_PATH, 'utf8');
-    return JSON.parse(data);
-  } catch (error) {
-    console.error("Error al leer la base de datos:", error);
-    return { products: [], history: [], chat_messages: [] };
+// Escribir base de datos de forma asíncrona compatible con Local / Vercel KV
+async function writeDB(data) {
+  if (process.env.KV_REST_API_URL) {
+    try {
+      await kv.set('inventario_db', data);
+      return true;
+    } catch (error) {
+      console.error("Error al escribir en Vercel KV:", error);
+      return false;
+    }
+  } else {
+    // Modo local (archivo JSON físico de forma atómica)
+    try {
+      const dir = path.dirname(DB_PATH);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      const tempPath = DB_PATH + '.tmp';
+      fs.writeFileSync(tempPath, JSON.stringify(data, null, 2), 'utf8');
+      fs.renameSync(tempPath, DB_PATH);
+      return true;
+    } catch (error) {
+      console.error("Error al escribir la base de datos local:", error);
+      return false;
+    }
   }
 }
 
-// Escribir base de datos de forma atómica
-function writeDB(data) {
-  try {
-    const tempPath = DB_PATH + '.tmp';
-    fs.writeFileSync(tempPath, JSON.stringify(data, null, 2), 'utf8');
-    fs.renameSync(tempPath, DB_PATH);
-    return true;
-  } catch (error) {
-    console.error("Error al escribir la base de datos:", error);
-    return false;
-  }
-}
-
-// Operaciones de Productos
-function getProducts() {
-  const db = readDB();
+// --- Operaciones de Productos (Asíncronas) ---
+async function getProducts() {
+  const db = await readDB();
   return db.products;
 }
 
-function saveProduct(productData) {
-  const db = readDB();
+async function saveProduct(productData) {
+  const db = await readDB();
   const index = db.products.findIndex(p => p.code.toUpperCase() === productData.code.toUpperCase());
   const now = new Date().toISOString();
   
@@ -161,12 +197,12 @@ function saveProduct(productData) {
     details: details
   });
 
-  writeDB(db);
+  await writeDB(db);
   return db.products.find(p => p.code.toUpperCase() === productData.code.toUpperCase());
 }
 
-function deleteProduct(code) {
-  const db = readDB();
+async function deleteProduct(code) {
+  const db = await readDB();
   const index = db.products.findIndex(p => p.code.toUpperCase() === code.toUpperCase());
   
   if (index !== -1) {
@@ -184,25 +220,25 @@ function deleteProduct(code) {
       details: `Producto eliminado del sistema. Stock al eliminar: ${removed.quantity}. Precio unitario: $${(removed.price || 0).toFixed(2)}.`
     });
 
-    writeDB(db);
+    await writeDB(db);
     return true;
   }
   return false;
 }
 
-// Operaciones de Historial y Mensajes
-function getHistory() {
-  const db = readDB();
+// --- Operaciones de Historial y Mensajes (Asíncronas) ---
+async function getHistory() {
+  const db = await readDB();
   return db.history;
 }
 
-function getChatMessages() {
-  const db = readDB();
+async function getChatMessages() {
+  const db = await readDB();
   return db.chat_messages;
 }
 
-function addChatMessage(message) {
-  const db = readDB();
+async function addChatMessage(message) {
+  const db = await readDB();
   const newMessage = {
     id: "msg_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5),
     timestamp: new Date().toISOString(),
@@ -215,13 +251,13 @@ function addChatMessage(message) {
     db.chat_messages.shift();
   }
   
-  writeDB(db);
+  await writeDB(db);
   return newMessage;
 }
 
 // Registrar un consumo desde el Chat (NLP)
-function processConsumption(code, quantity, person, vehicle) {
-  const db = readDB();
+async function processConsumption(code, quantity, person, vehicle) {
+  const db = await readDB();
   const index = db.products.findIndex(p => p.code.toUpperCase() === code.toUpperCase());
 
   if (index === -1) {
@@ -262,7 +298,7 @@ function processConsumption(code, quantity, person, vehicle) {
   };
   db.history.push(log);
 
-  writeDB(db);
+  await writeDB(db);
 
   return {
     success: true,
@@ -279,8 +315,8 @@ function processConsumption(code, quantity, person, vehicle) {
 }
 
 // Registrar un ingreso desde el Chat (NLP)
-function processAddition(code, quantity, person) {
-  const db = readDB();
+async function processAddition(code, quantity, person) {
+  const db = await readDB();
   const index = db.products.findIndex(p => p.code.toUpperCase() === code.toUpperCase());
 
   if (index === -1) {
@@ -316,7 +352,7 @@ function processAddition(code, quantity, person) {
   };
   db.history.push(log);
 
-  writeDB(db);
+  await writeDB(db);
 
   return {
     success: true,
@@ -333,8 +369,8 @@ function processAddition(code, quantity, person) {
 }
 
 // Deshacer una transacción (Undo)
-function undoTransaction(transactionId) {
-  const db = readDB();
+async function undoTransaction(transactionId) {
+  const db = await readDB();
   const logIndex = db.history.findIndex(h => h.id === transactionId);
 
   if (logIndex === -1) {
@@ -391,7 +427,7 @@ function undoTransaction(transactionId) {
   // Eliminar el log original para que no se pueda deshacer dos veces
   db.history.splice(logIndex, 1);
 
-  writeDB(db);
+  await writeDB(db);
 
   return {
     success: true,
@@ -403,8 +439,8 @@ function undoTransaction(transactionId) {
   };
 }
 
-function clearHistory() {
-  const db = readDB();
+async function clearHistory() {
+  const db = await readDB();
   db.history = [];
   db.chat_messages = [
     {
@@ -421,24 +457,24 @@ function clearHistory() {
     p.pendingReplenishment = 0;
   });
   
-  writeDB(db);
+  await writeDB(db);
   return true;
 }
 
-function getOfficeLocations() {
-  const db = readDB();
+async function getOfficeLocations() {
+  const db = await readDB();
   return db.officeLocations || [];
 }
 
-function saveOfficeLocation(loc) {
+async function saveOfficeLocation(loc) {
   if (!loc || loc.trim() === '') return;
-  const db = readDB();
+  const db = await readDB();
   if (!db.officeLocations) db.officeLocations = [];
   const normalized = loc.trim();
   // Búsqueda case-insensitive para evitar duplicados
   if (!db.officeLocations.some(l => l.toLowerCase() === normalized.toLowerCase())) {
     db.officeLocations.push(normalized);
-    writeDB(db);
+    await writeDB(db);
   }
 }
 
