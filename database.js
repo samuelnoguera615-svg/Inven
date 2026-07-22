@@ -1,5 +1,12 @@
 const fs = require('fs');
 const path = require('path');
+
+// Soporte híbrido para integraciones de Upstash Redis directas en Vercel
+if (!process.env.KV_REST_API_URL && process.env.UPSTASH_REDIS_REST_URL) {
+  process.env.KV_REST_API_URL = process.env.UPSTASH_REDIS_REST_URL;
+  process.env.KV_REST_API_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
+}
+
 const { kv } = require('@vercel/kv');
 
 const DB_PATH = path.join(__dirname, 'data', 'database.json');

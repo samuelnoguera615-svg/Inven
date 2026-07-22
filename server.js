@@ -301,7 +301,7 @@ function parseConsumptionMessage(text, products) {
 app.get('/api/debug-env', (req, res) => {
   res.json({
     kv_present: !!process.env.KV_REST_API_URL,
-    redis_keysPresent: Object.keys(process.env).filter(k => k.startsWith('KV_') || k.startsWith('REDIS_')),
+    redis_keysPresent: Object.keys(process.env).filter(k => k.startsWith('KV_') || k.startsWith('REDIS_') || k.startsWith('UPSTASH_')),
     node_env: process.env.NODE_ENV
   });
 });
