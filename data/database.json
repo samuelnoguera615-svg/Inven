@@ -428,6 +428,19 @@
       "ubicacionDetalle": "GABETERO 1",
       "createdAt": "2026-07-21T23:23:13.029Z",
       "updatedAt": "2026-07-21T23:23:13.029Z"
+    },
+    {
+      "code": "TEST-UI",
+      "name": "UI Test",
+      "proveedor": "X",
+      "quantity": 7,
+      "minQuantity": 1,
+      "price": 12,
+      "pendingReplenishment": 0,
+      "ubicacion": "Almacén",
+      "ubicacionDetalle": "",
+      "createdAt": "2026-07-22T00:29:26.189Z",
+      "updatedAt": "2026-07-22T00:29:26.189Z"
     }
   ],
   "history": [
@@ -903,6 +916,17 @@
       "priceUnit": 0,
       "person": "Administrador",
       "details": "Nuevo producto registrado en inventario con 1 unidades (ubicación: Oficina) a un precio de $0.00 c/u."
+    },
+    {
+      "id": "log_1784680166189_8785b",
+      "timestamp": "2026-07-22T00:29:26.189Z",
+      "action": "CREAR_PRODUCTO",
+      "productCode": "TEST-UI",
+      "productName": "UI Test",
+      "quantityChange": 7,
+      "priceUnit": 12,
+      "person": "Administrador",
+      "details": "Nuevo producto registrado en inventario con 7 unidades (ubicación: Almacén) a un precio de $12.00 c/u."
     }
   ],
   "chat_messages": [

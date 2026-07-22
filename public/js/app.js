@@ -340,14 +340,26 @@ function setupProductForm() {
         body: JSON.stringify(payload)
       });
 
-      if (!res.ok) throw new Error('Error al guardar el producto');
+      const contentType = res.headers.get('content-type') || '';
+      let body;
+      if (contentType.includes('application/json')) {
+        body = await res.json();
+      } else {
+        body = await res.text();
+      }
+
+      if (!res.ok) {
+        throw new Error(body.error || body.message || 'Error al guardar el producto');
+      }
       
       showToast(isEditing ? 'Producto actualizado' : 'Producto agregado con éxito', 'success');
       closeModal();
-      fetchProducts();
-      fetchHistory(); // El historial cambia
-      fetchOfficeLocations(); // Cargar nuevas ubicaciones guardadas
+      await Promise.all([fetchProducts(), fetchHistory(), fetchOfficeLocations()]);
+      setTimeout(() => {
+        fetchProducts();
+      }, 1000);
     } catch (error) {
+      console.error(error);
       showToast(error.message, 'danger');
     }
   });
