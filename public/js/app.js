@@ -249,24 +249,26 @@ function renderInventoryTable(data) {
       ? `<span style="color: var(--amber); font-weight: 700;">⚠️ ${pendingRepVal}</span>` 
       : `<span style="color: var(--success); font-weight: 500;">✓ 0</span>`;
 
+    const codeEscapedForJS = String(p.code).replace(/'/g, "\\'");
+
     tr.innerHTML = `
       <td><span class="product-code-badge">${escapeHTML(p.code)}</span></td>
       <td style="font-weight:600;">${escapeHTML(p.name)}</td>
       <td>${escapeHTML(p.proveedor || 'General')}</td>
-      <td style="font-weight:600;">$${priceFormatted}</td>
+      <td style="font-weight:600;">${priceFormatted}</td>
       <td>${p.minQuantity}</td>
       <td style="font-weight:700; font-size:15px;">${p.quantity}</td>
       <td style="text-align: center; font-weight:700;">${pendingRepHTML}</td>
       <td><span class="status-badge ${statusClass}">${statusText}</span></td>
       <td>
         <div class="table-actions">
-          <button class="btn-table-action" onclick="openProductDetailModal('${p.code}')" title="Ver Detalles" style="border-color: var(--info); color: #22d3ee;">
+          <button class="btn-table-action" onclick="openProductDetailModal('${codeEscapedForJS}')" title="Ver Detalles" style="border-color: var(--info); color: #22d3ee;">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path></svg>
           </button>
-          <button class="btn-table-action edit" onclick="openEditProductModal('${p.code}')" title="Editar Producto">
+          <button class="btn-table-action edit" onclick="openEditProductModal('${codeEscapedForJS}')" title="Editar Producto">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>
           </button>
-          <button class="btn-table-action delete" onclick="deleteProduct('${p.code}')" title="Eliminar Producto">
+          <button class="btn-table-action delete" onclick="deleteProduct('${codeEscapedForJS}')" title="Eliminar Producto">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
           </button>
         </div>
