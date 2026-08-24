@@ -190,7 +190,7 @@ function setupTabs() {
 async function fetchProducts() {
   const localProducts = readLocalProducts();
   if (localProducts.length) {
-    products = mergeInventoryData(localProducts);
+    products = localProducts.map(normalizeProductForStorage);
     renderInventoryTable(products);
     updateStats(products);
     populateProviderFilter(products);
@@ -201,7 +201,7 @@ async function fetchProducts() {
     const res = await fetch(`${API_URL}/api/products`);
     if (!res.ok) throw new Error('Error al obtener productos');
     const remoteProducts = await res.json();
-    products = mergeInventoryData(remoteProducts);
+    products = remoteProducts.map(normalizeProductForStorage);
     writeLocalProducts(products);
     renderInventoryTable(products);
     updateStats(products);
