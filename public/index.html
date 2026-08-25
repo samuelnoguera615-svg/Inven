@@ -423,10 +423,10 @@
             <label style="display: block; margin-bottom: 6px; font-weight: 600;">Instrucciones de Carga Masiva</label>
             <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 12px; font-size: 13px; color: rgba(255,255,255,0.8); line-height: 1.5;">
               <p style="margin: 0 0 8px 0; font-weight: 600; color: var(--primary);">Formato de cada línea:</p>
-              <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; display: block; font-family: monospace; margin-bottom: 8px;">CÓDIGO, NOMBRE DEL PRODUCTO, CANTIDAD, UBICACIÓN</code>
-              <p style="margin: 0 0 6px 0;"><strong>Ubicación válida:</strong> <code>Almacén</code> u <code>Oficina: NombreEspecifico</code> (Ej: <em>Oficina: GABETERO 1</em>).</p>
+              <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; display: block; font-family: monospace; margin-bottom: 8px;">CÓDIGO, NOMBRE DEL PRODUCTO, CANTIDAD, UBICACIÓN/DETALLE</code>
+              <p style="margin: 0 0 6px 0;"><strong>Ubicación inteligente:</strong> Si escribes <code>Almacén</code> (o lo dejas vacío), se guarda en el Almacén. Si escribes cualquier otra descripción (ej: <code>GABETERO 1</code>, <code>Estante B</code>), el sistema lo clasificará automáticamente en **Oficina** con esa descripción como ubicación detallada.</p>
               <p style="margin: 0 0 6px 0;">Puedes separar los datos usando <strong>comas (,)</strong>, <strong>punto y coma (;)</strong> o <strong>tabuladores</strong> (si copias y pegas directo de Excel).</p>
-              <p style="margin: 0;"><em>Ejemplo:</em><br><code style="font-family: monospace; color: var(--success); font-size: 11px;">LAP-05, Laptop Acer, 5, Almacén<br>MON-10, Monitor HP 24, 10, Oficina: Sala Principal</code></p>
+              <p style="margin: 0;"><em>Ejemplo:</em><br><code style="font-family: monospace; color: var(--success); font-size: 11px;">LAP-05, Laptop Acer, 5, Almacén<br>MON-10, Monitor HP 24, 10, GABETERO 1</code></p>
             </div>
           </div>
           <form id="bulk-product-form">

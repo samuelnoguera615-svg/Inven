@@ -534,14 +534,14 @@ function setupBulkProductForm() {
       let ubicacion = 'Almacén';
       let ubicacionDetalle = '';
 
-      if (rawLocation.toLowerCase().startsWith('oficina:')) {
-        ubicacion = 'Oficina';
-        ubicacionDetalle = rawLocation.substring(8).trim();
-      } else if (rawLocation.toLowerCase().startsWith('oficina')) {
-        ubicacion = 'Oficina';
-        ubicacionDetalle = parts[4] ? parts[4].trim() : '';
-      } else {
+      const normalizedLoc = rawLocation.toLowerCase();
+      if (normalizedLoc === 'almacén' || normalizedLoc === 'almacen' || normalizedLoc === '') {
         ubicacion = 'Almacén';
+        ubicacionDetalle = '';
+      } else {
+        // Cualquier otra descripción (ej: GABETERO 1, Escritorio B) se asume como ubicación en Oficina
+        ubicacion = 'Oficina';
+        ubicacionDetalle = rawLocation;
       }
 
       if (!code || !name) {
