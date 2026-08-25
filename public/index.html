@@ -352,6 +352,12 @@
         <button class="modal-close" id="close-modal-btn">&times;</button>
       </div>
       <div class="modal-body">
+        <!-- SELECTOR DE PESTAÑAS (MODO INDIVIDUAL VS MASIVO) -->
+        <div class="modal-tab-container" id="modal-tab-selector" style="display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 12px;">
+          <button type="button" class="tab-btn active" id="tab-single-btn" style="flex: 1; padding: 10px; background: rgba(34,211,238,0.1); color: #22d3ee; border: 1px solid rgba(34,211,238,0.3); border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.2s;">Añadir Individual</button>
+          <button type="button" class="tab-btn" id="tab-bulk-btn" style="flex: 1; padding: 10px; background: transparent; color: rgba(255,255,255,0.6); border: 1px solid transparent; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.2s;">Añadir por Cantidad (Carga Masiva)</button>
+        </div>
+
         <form id="product-form">
           <div class="form-group">
             <label for="prod-code">Código Único de Producto *</label>
@@ -410,6 +416,30 @@
             <button type="submit" class="btn btn-primary" id="save-product-btn">Guardar Producto</button>
           </div>
         </form>
+
+        <!-- FORMULARIO DE CARGA MASIVA -->
+        <div id="bulk-product-container" style="display: none;">
+          <div class="form-group" style="margin-bottom: 15px;">
+            <label style="display: block; margin-bottom: 6px; font-weight: 600;">Instrucciones de Carga Masiva</label>
+            <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; padding: 12px; font-size: 13px; color: rgba(255,255,255,0.8); line-height: 1.5;">
+              <p style="margin: 0 0 8px 0; font-weight: 600; color: var(--primary);">Formato de cada línea:</p>
+              <code style="background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px; display: block; font-family: monospace; margin-bottom: 8px;">CÓDIGO, NOMBRE DEL PRODUCTO, CANTIDAD, UBICACIÓN</code>
+              <p style="margin: 0 0 6px 0;"><strong>Ubicación válida:</strong> <code>Almacén</code> u <code>Oficina: NombreEspecifico</code> (Ej: <em>Oficina: GABETERO 1</em>).</p>
+              <p style="margin: 0 0 6px 0;">Puedes separar los datos usando <strong>comas (,)</strong>, <strong>punto y coma (;)</strong> o <strong>tabuladores</strong> (si copias y pegas directo de Excel).</p>
+              <p style="margin: 0;"><em>Ejemplo:</em><br><code style="font-family: monospace; color: var(--success); font-size: 11px;">LAP-05, Laptop Acer, 5, Almacén<br>MON-10, Monitor HP 24, 10, Oficina: Sala Principal</code></p>
+            </div>
+          </div>
+          <form id="bulk-product-form">
+            <div class="form-group">
+              <label for="bulk-text-input">Pega tu lista de productos *</label>
+              <textarea id="bulk-text-input" rows="8" placeholder="COD-01, Nombre Producto 1, 10, Almacén&#10;COD-02, Nombre Producto 2, 5, Oficina: Estante A" style="width: 100%; font-family: monospace; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; color: #fff; padding: 10px; resize: vertical;" required></textarea>
+            </div>
+            <div class="modal-actions" style="margin-top: 20px;">
+              <button type="button" class="btn btn-secondary" id="cancel-bulk-modal-btn">Cancelar</button>
+              <button type="submit" class="btn btn-primary" id="save-bulk-products-btn">Procesar Carga Masiva</button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   </div>

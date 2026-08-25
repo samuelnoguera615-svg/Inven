@@ -82,6 +82,7 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchHistory();
   fetchChatMessages();
   setupProductForm();
+  setupBulkProductForm();
   setupSearchAndFilters();
   setupChatSuggestions();
   setupStatsControls();
@@ -325,11 +326,52 @@ const cancelModalBtn = document.getElementById('cancel-modal-btn');
 const productForm = document.getElementById('product-form');
 const prodCodeInput = document.getElementById('prod-code');
 
+// Elementos de Carga Masiva (Bulk Upload Elements)
+const tabSingleBtn = document.getElementById('tab-single-btn');
+const tabBulkBtn = document.getElementById('tab-bulk-btn');
+const bulkProductContainer = document.getElementById('bulk-product-container');
+const bulkTextInput = document.getElementById('bulk-text-input');
+const bulkProductForm = document.getElementById('bulk-product-form');
+const cancelBulkModalBtn = document.getElementById('cancel-bulk-modal-btn');
+
+function switchModalTab(tab) {
+  if (tab === 'single') {
+    tabSingleBtn.style.background = 'rgba(34,211,238,0.1)';
+    tabSingleBtn.style.color = '#22d3ee';
+    tabSingleBtn.style.borderColor = 'rgba(34,211,238,0.3)';
+    
+    tabBulkBtn.style.background = 'transparent';
+    tabBulkBtn.style.color = 'rgba(255,255,255,0.6)';
+    tabBulkBtn.style.borderColor = 'transparent';
+    
+    productForm.style.display = 'block';
+    bulkProductContainer.style.display = 'none';
+  } else {
+    tabBulkBtn.style.background = 'rgba(34,211,238,0.1)';
+    tabBulkBtn.style.color = '#22d3ee';
+    tabBulkBtn.style.borderColor = 'rgba(34,211,238,0.3)';
+    
+    tabSingleBtn.style.background = 'transparent';
+    tabSingleBtn.style.color = 'rgba(255,255,255,0.6)';
+    tabSingleBtn.style.borderColor = 'transparent';
+    
+    productForm.style.display = 'none';
+    bulkProductContainer.style.display = 'block';
+  }
+}
+
+tabSingleBtn.addEventListener('click', () => switchModalTab('single'));
+tabBulkBtn.addEventListener('click', () => switchModalTab('bulk'));
+
 openAddModalBtn.addEventListener('click', () => {
   isEditing = false;
   document.getElementById('modal-title').textContent = 'Agregar Nuevo Producto';
+  document.getElementById('modal-tab-selector').style.display = 'flex'; // Mostrar pestañas al agregar
+  switchModalTab('single');
+  
   prodCodeInput.removeAttribute('readonly');
   productForm.reset();
+  bulkProductForm.reset();
   
   // Resetear campos de ubicación
   document.querySelectorAll('input[name="prod-location"]').forEach(r => {
@@ -345,10 +387,12 @@ openAddModalBtn.addEventListener('click', () => {
 function closeModal() {
   modal.classList.remove('active');
   productForm.reset();
+  bulkProductForm.reset();
 }
 
 closeModalBtn.addEventListener('click', closeModal);
 cancelModalBtn.addEventListener('click', closeModal);
+cancelBulkModalBtn.addEventListener('click', closeModal);
 
 function openEditProductModal(code) {
   const product = products.find(p => p.code.toUpperCase() === code.toUpperCase());
@@ -356,6 +400,8 @@ function openEditProductModal(code) {
 
   isEditing = true;
   document.getElementById('modal-title').textContent = `Editar Producto: ${product.code}`;
+  document.getElementById('modal-tab-selector').style.display = 'none'; // Ocultar pestañas al editar
+  switchModalTab('single');
   
   // Rellenar campos
   prodCodeInput.value = product.code;
@@ -445,6 +491,129 @@ function setupProductForm() {
     } catch (error) {
       console.warn('No se pudo sincronizar con el servidor, pero el producto se guardó localmente:', error);
       showToast('Producto guardado localmente. Conexión con servidor no disponible.', 'warning');
+    }
+  });
+}
+
+function setupBulkProductForm() {
+  bulkProductForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const textInput = bulkTextInput.value;
+    if (!textInput || textInput.trim() === '') {
+      showToast('El texto de carga no puede estar vacío.', 'danger');
+      return;
+    }
+
+    const lines = textInput.split('\n');
+    let parsedCount = 0;
+    let successCount = 0;
+    let errorMessages = [];
+
+    showToast('Procesando carga masiva...', 'info');
+
+    // Carga local optimista
+    const optimisticProducts = [...products];
+    const bulkPayloads = [];
+
+    for (const line of lines) {
+      const trimmedLine = line.trim();
+      if (!trimmedLine) continue;
+
+      // Soportar comas, punto y coma, o tabuladores
+      const parts = trimmedLine.split(/[,;\t]/);
+      if (parts.length < 3) {
+        errorMessages.push(`Línea inválida: "${trimmedLine}" (debe tener Código, Nombre, Cantidad)`);
+        continue;
+      }
+
+      const code = parts[0].trim().toUpperCase();
+      const name = parts[1].trim();
+      const quantity = parseFloat(parts[2].trim()) || 0;
+      const rawLocation = parts[3] ? parts[3].trim() : 'Almacén';
+
+      let ubicacion = 'Almacén';
+      let ubicacionDetalle = '';
+
+      if (rawLocation.toLowerCase().startsWith('oficina:')) {
+        ubicacion = 'Oficina';
+        ubicacionDetalle = rawLocation.substring(8).trim();
+      } else if (rawLocation.toLowerCase().startsWith('oficina')) {
+        ubicacion = 'Oficina';
+        ubicacionDetalle = parts[4] ? parts[4].trim() : '';
+      } else {
+        ubicacion = 'Almacén';
+      }
+
+      if (!code || !name) {
+        errorMessages.push(`Línea inválida: "${trimmedLine}" (Código y nombre obligatorios)`);
+        continue;
+      }
+
+      parsedCount++;
+
+      const payload = {
+        code,
+        name,
+        proveedor: 'General',
+        minQuantity: 2,
+        price: 0.0,
+        quantity,
+        ubicacion,
+        ubicacionDetalle
+      };
+
+      bulkPayloads.push(payload);
+
+      // Sincronizar local
+      const savedProduct = normalizeProductForStorage(payload);
+      const existingIdx = optimisticProducts.findIndex(item => item.code.toUpperCase() === savedProduct.code.toUpperCase());
+      if (existingIdx >= 0) {
+        optimisticProducts[existingIdx] = savedProduct;
+      } else {
+        optimisticProducts.push(savedProduct);
+      }
+    }
+
+    // Actualizar visual optimista de inmediato
+    products = optimisticProducts;
+    writeLocalProducts(products);
+    renderInventoryTable(products);
+    updateStats(products);
+    populateProviderFilter(products);
+    populateStatsProductSelect(products);
+
+    closeModal();
+
+    // Sincronizar de forma secuencial al servidor
+    for (const payload of bulkPayloads) {
+      try {
+        const res = await fetch(`${API_URL}/api/products`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+
+        if (res.ok) {
+          successCount++;
+        } else {
+          const errBody = await res.json().catch(() => ({}));
+          errorMessages.push(`Error en ${payload.code}: ${errBody.error || 'error desconocido'}`);
+        }
+      } catch (e) {
+        errorMessages.push(`Error al conectar para ${payload.code}: ${e.message}`);
+      }
+    }
+
+    if (successCount > 0) {
+      showToast(`¡Cargados ${successCount} de ${parsedCount} productos con éxito!`, 'success');
+      await fetchProducts();
+      await fetchHistory();
+      await fetchOfficeLocations();
+    }
+
+    if (errorMessages.length > 0) {
+      console.warn("Errores en carga masiva:", errorMessages);
+      alert(`Errores durante la carga masiva:\n\n${errorMessages.slice(0, 10).join('\n')}${errorMessages.length > 10 ? '\n...y otros más en la consola de Vercel.' : ''}`);
     }
   });
 }
